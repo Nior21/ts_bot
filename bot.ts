@@ -1,8 +1,10 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { db } from './firebase';
 import * as process from 'process';
 import dotenv from 'dotenv';
 dotenv.config();
+
+import { db } from './firebase';
+import { isAdmin, sendAdminMessage, loadUserData, handlePhoneInput, handleParentNameInput, handleIsMotherInput, handleCheckChildren } from './reg';
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;
@@ -11,42 +13,19 @@ const bot = new TelegramBot(token, { polling: true });
 
 bot.on("polling_error", (msg) => console.log(msg));
 
+// Реакция на команду /start
 bot.onText(/\/start/, async (msg: any) => {
     const chatId = msg.chat.id;
-    //const registered = await checkBotRegistration(token);
-    if (admin_id == chatId) {
-        bot.sendMessage(chatId, `Вы зашли в систему с ролью администратора (chatId: ${chatId})`);
+
+    if (isAdmin(chatId)) {
+        sendAdminMessage(chatId);
+        return; // Выход из функции, если пользователь - администратор
     }
 
-    const userRef = db.ref(`users/${chatId}`);
-
-    userRef.once('value', async (snapshot) => {
-        if (snapshot.exists()) {
-            // Логика, если пользователь уже существует
-            bot.sendMessage(chatId, `Запись для пользователя ${chatId} уже существует`);
-            const userData = snapshot.val();
-            const userInfo: string = `Информация о пользователе ${chatId}:\n` +
-                `Родитель: ${userData.phone} ${userData.parentName} (${userData.isMother ? 'мать' : 'отец'})\n` +
-                `Ребенок: ${userData.childName} ${userData.childSurname} (ДР: ${userData.birthday})`;
-
-            bot.sendMessage(chatId, userInfo);
-        } else {
-            // Добавляем нового пользователя, так как пользователя с таким chatId нет в базе
-            userRef.set({
-                phone: 'empty',
-                parentName: 'empty',
-                isMother: 'empty',
-                childName: 'empty',
-                childSurname: 'empty',
-                birthday: 'empty',
-                stage: 'phone' // Стартуем с этапа ввода телефона
-            });
-            bot.sendMessage(chatId, 'Введите свой контактный номер телефона:');
-        }
-    });
+    loadUserData(chatId);
 });
 
-// Обработчик текстовых сообщений от пользователя
+// Проверка тестовых запросов
 bot.on('text', async (msg: any) => {
     const chatId = msg.chat.id;
     const text = msg.text;
@@ -59,46 +38,22 @@ bot.on('text', async (msg: any) => {
         if (userData) {
             switch (userData.stage) {
                 case 'phone':
-                    userRef.update({ phone: text, stage: 'parentName' });
-                    bot.sendMessage(chatId, 'Теперь введите ваше имя:');
+                    handlePhoneInput(userRef, chatId, text);
                     break;
                 case 'parentName':
-                    userRef.update({ parentName: text, stage: 'isMother' });
-                    bot.sendMessage(chatId, 'Укажите, кем вы приходитесь ребенку (мать/отец/бабушка/дедушка/брат/сестра/тетя/дядя):');
+                    handleParentNameInput(userRef, chatId, text);
                     break;
                 case 'isMother':
-                    userRef.update({ isMother: text, stage: 'childName' });
-                    bot.sendMessage(chatId, 'Введите имя вашего ребенка:');
+                    handleIsMotherInput(userRef, chatId, text);
                     break;
-                case 'childName':
-                    userRef.update({ childName: text, stage: 'childSurname' });
-                    bot.sendMessage(chatId, 'Введите фамилию вашего ребенка:');
-                    break;
-                case 'childSurname':
-                    userRef.update({ childSurname: text, stage: 'birthday' });
-                    bot.sendMessage(chatId, 'Спасибо! Ваши данные успешно добавлены в базу.');
-                    break;
-                case 'birthday':
-                    userRef.update({ birthday: text, stage: 'completed' });
-                    bot.sendMessage(chatId, 'Спасибо! Ваши данные успешно добавлены в базу.');
-                    break;
-                default:
-                    bot.sendMessage(chatId, 'Неожиданное сообщение. Пожалуйста, используйте команду /start для начала процесса снова.');
+                case 'checkChildren':
+                    handleCheckChildren(userRef, chatId, text, userData);
                     break;
             }
-        } else {
-            // Добавляем нового пользователя, так как данных в базе не существует
-            userRef.update({
-                phone: text || 'empty', // Если значение text пустое, сохраняем пустую строку
-                parentName: 'empty',
-                isMother: 'empty',
-                childName: 'empty',
-                childSurname: 'empty',
-                birthday: 'empty',
-                stage: 'phone' // Стартуем с этапа ввода телефона
-            });
-
-            bot.sendMessage(chatId, 'Введите свой контактный номер телефона:');
         }
     });
 });
+
+export function sendMessage(chatId: number, text: string) {
+    bot.sendMessage(chatId, text);
+}
