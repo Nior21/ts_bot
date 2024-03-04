@@ -27,17 +27,18 @@ bot.onText(/\/start/, async (msg: any) => {
             const userData = snapshot.val();
             const userInfo: string = `Информация о пользователе ${chatId}:\n` +
                 `Родитель: ${userData.phone} ${userData.parentName} (${userData.isMother ? 'мать' : 'отец'})\n` +
-                `Ребенок: ${userData.childName} ${userData.childSurname}`;
+                `Ребенок: ${userData.childName} ${userData.childSurname} (ДР: ${userData.birthday})`;
 
             bot.sendMessage(chatId, userInfo);
         } else {
             // Добавляем нового пользователя, так как пользователя с таким chatId нет в базе
             userRef.set({
-                phone: '',
-                parentName: '',
-                isMother: '',
-                childName: '',
-                childSurname: '',
+                phone: 'empty',
+                parentName: 'empty',
+                isMother: 'empty',
+                childName: 'empty',
+                childSurname: 'empty',
+                birthday: 'empty',
                 stage: 'phone' // Стартуем с этапа ввода телефона
             });
             bot.sendMessage(chatId, 'Введите свой контактный номер телефона:');
@@ -63,7 +64,7 @@ bot.on('text', async (msg: any) => {
                     break;
                 case 'parentName':
                     userRef.update({ parentName: text, stage: 'isMother' });
-                    bot.sendMessage(chatId, 'Введите ваш пол (мужской/женский):');
+                    bot.sendMessage(chatId, 'Укажите, кем вы приходитесь ребенку (мать/отец/бабушка/дедушка/брат/сестра/тетя/дядя):');
                     break;
                 case 'isMother':
                     userRef.update({ isMother: text, stage: 'childName' });
@@ -74,7 +75,11 @@ bot.on('text', async (msg: any) => {
                     bot.sendMessage(chatId, 'Введите фамилию вашего ребенка:');
                     break;
                 case 'childSurname':
-                    userRef.update({ childSurname: text, stage: 'completed' });
+                    userRef.update({ childSurname: text, stage: 'birthday' });
+                    bot.sendMessage(chatId, 'Спасибо! Ваши данные успешно добавлены в базу.');
+                    break;
+                case 'birthday':
+                    userRef.update({ birthday: text, stage: 'completed' });
                     bot.sendMessage(chatId, 'Спасибо! Ваши данные успешно добавлены в базу.');
                     break;
                 default:
@@ -84,11 +89,12 @@ bot.on('text', async (msg: any) => {
         } else {
             // Добавляем нового пользователя, так как данных в базе не существует
             userRef.update({
-                phone: text || '', // Если значение text пустое, сохраняем пустую строку
-                parentName: '',
-                isMother: '',
-                childName: '',
-                childSurname: '',
+                phone: text || 'empty', // Если значение text пустое, сохраняем пустую строку
+                parentName: 'empty',
+                isMother: 'empty',
+                childName: 'empty',
+                childSurname: 'empty',
+                birthday: 'empty',
                 stage: 'phone' // Стартуем с этапа ввода телефона
             });
 
