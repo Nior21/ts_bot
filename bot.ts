@@ -1,59 +1,50 @@
 import TelegramBot from 'node-telegram-bot-api';
-import * as process from 'process';
+import { db } from './firebase';
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { db } from './firebase';
-import { isAdmin, sendAdminMessage, loadUserData, handlePhoneInput, handleParentNameInput, handleIsMotherInput, handleCheckChildren } from './reg';
+import * as registrationModule from './start';
+import * as paymentsModule from './payment';
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;
 
-const bot = new TelegramBot(token, { polling: true });
+export const bot = new TelegramBot(token, { polling: true });
 
 bot.on("polling_error", (msg) => console.log(msg));
 
 // Реакция на команду /start
 bot.onText(/\/start/, async (msg: any) => {
-    const chatId = msg.chat.id;
-
-    if (isAdmin(chatId)) {
-        sendAdminMessage(chatId);
-        return; // Выход из функции, если пользователь - администратор
-    }
-
-    loadUserData(chatId);
+    registrationModule.registration(msg);
 });
 
-// Проверка тестовых запросов
+// Диалоги, проверка введенного обычного текста
 bot.on('text', async (msg: any) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
+    const stagesRef = db.ref(`users/${msg.chat.id}/stages`);
 
-    const userRef = db.ref(`users/${chatId}`);
+    stagesRef.once('value', async (snapshot) => {
+        const stagesData = snapshot.val();
 
-    userRef.once('value', async (snapshot) => {
-        const userData = snapshot.val();
-
-        if (userData) {
-            switch (userData.stage) {
-                case 'phone':
-                    handlePhoneInput(userRef, chatId, text);
+        if (stagesData) {
+            switch (stagesData.current) {
+                case 'registration':
+                    registrationModule.regDialogs(msg, stagesRef);
                     break;
-                case 'parentName':
-                    handleParentNameInput(userRef, chatId, text);
+                case 'payment':
+                    paymentsModule.paymentDialog(msg, stagesRef);
                     break;
-                case 'isMother':
-                    handleIsMotherInput(userRef, chatId, text);
-                    break;
-                case 'checkChildren':
-                    handleCheckChildren(userRef, chatId, text, userData);
+                case 'idle':
+                    bot.sendMessage(admin_id, `${msg.chat.id} > ${msg.text}`);
+                    bot.sendMessage(msg.chat.id, `Ваше сообщение успешно доставлено администратору: ${msg.text}`);
                     break;
             }
+        } else {
+            registrationModule.regDialogs(msg, stagesRef);
         }
-    });
+    })
 });
 
-export function sendMessage(chatId: number, text: string) {
-    bot.sendMessage(chatId, text);
-}
+// Реакция на команду /payment
+bot.onText(/\/payment/, async (msg: any) => {
+    paymentsModule.paymentDialog(msg);
+});
