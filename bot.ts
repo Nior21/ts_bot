@@ -24,21 +24,29 @@ bot.on('text', async (msg: any) => {
 
     stagesRef.once('value', async (snapshot) => {
         const stagesData = snapshot.val();
-
         if (stagesData) {
+            console.log('> проверяем базовые статусы в БД (stagesData.current)');
             switch (stagesData.current) {
-                case 'registration':
-                    registrationModule.regDialogs(msg, stagesRef);
-                    break;
-                case 'payment':
-                    paymentsModule.paymentDialog(msg, stagesRef);
-                    break;
                 case 'idle':
                     bot.sendMessage(admin_id, `${msg.chat.id} > ${msg.text}`);
                     bot.sendMessage(msg.chat.id, `Ваше сообщение успешно доставлено администратору: ${msg.text}`);
                     break;
+                case 'registration':
+                    if (msg.text !== '/start') {
+                        registrationModule.regDialogs(msg, stagesRef);
+                        break;
+                    }
+                case 'payment':
+                    if (msg.text !== '/payment') {
+                        // Функция для повторного обращения с указанием имени
+                        console.log('>> запуск ветки payment')
+                        paymentsModule.paymentDialog(msg, stagesRef);
+                        break;
+                    }
+                default:
+                    console.log('>> статусы не обнаружены')
             }
-        } else {
+        } else { // Если данные пользователя не были найдены, уходим к созданию пользователей
             registrationModule.regDialogs(msg, stagesRef);
         }
     })
@@ -46,5 +54,15 @@ bot.on('text', async (msg: any) => {
 
 // Реакция на команду /payment
 bot.onText(/\/payment/, async (msg: any) => {
-    paymentsModule.paymentDialog(msg);
+    const inputArray = msg.text ? msg.text.split(' ') : [];
+    if (inputArray.length === 1) {
+        // Запускаем функцию для /payment без параметров
+        console.log('> первый запуск /payment.', typeof inputArray, inputArray)
+        console.log('inputArray.length', typeof inputArray.length, inputArray.length)
+        paymentsModule.paymentWithoutParam(msg);
+    } else if (inputArray.length >= 2) {
+        // Запускаем функцию для /payment без параметров
+        paymentsModule.paymentWithParam(msg, inputArray);
+    }
 });
+

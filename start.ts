@@ -91,7 +91,7 @@ function handleCheckChildren(userRef: any, chatId: number, text: string, stagesR
         const childrenRef = db.ref('children');
 
         childrenRef.once('value', (snapshot) => {
-            const childrenData = snapshot.val(); console.log("childrenData: ", childrenData)
+            const childrenData = snapshot.val();
 
             if (childrenData) {
                 let child_id: any = null;
