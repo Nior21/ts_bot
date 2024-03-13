@@ -65,4 +65,3 @@ bot.onText(/\/payment/, async (msg: any) => {
         paymentsModule.paymentWithParam(msg, inputArray);
     }
 });
-
