@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db } from './firebaseModule';
 import { bot } from './bot';
 
 import dotenv from 'dotenv';

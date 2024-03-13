@@ -1,4 +1,4 @@
-import { db } from './firebase';
+import { db } from './firebaseModule';
 import { bot } from './bot';
 
 import dotenv from 'dotenv';
@@ -121,7 +121,7 @@ function handleCheckChildren(userRef: any, chatId: number, text: string, stagesR
 
                     // Обновляем данные пользователя с новым child_id
                     userRef.update({ child_id: newChildRef.key });
-                    stagesRef.update({ registration: 'completed' });
+                    stagesRef.update({ current: 'idle', registration: 'completed' });
                 }
             }
         });
