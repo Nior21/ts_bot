@@ -5,7 +5,7 @@ dotenv.config();
 
 import * as registrationModule from './start';
 import * as paymentsModule from './payment';
-import { findObject } from './firebaseSearchModule'; // Импорт вашего модуля поиска
+import { findObject } from './firebaseSearchModule';
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;

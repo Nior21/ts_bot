@@ -1,5 +1,6 @@
 .env
 serviceAccountKey.json
+payments.json
 
 node_modules
 package-lock.json
