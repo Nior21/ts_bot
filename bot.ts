@@ -3,9 +3,13 @@ import { db } from './firebaseModule';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { findObject } from './firebaseSearchModule';
+import { formatDataForDisplay } from './dataFormatting';
+
 import * as registrationModule from './start';
 import * as paymentsModule from './payment';
-import { findObject } from './firebaseSearchModule';
+
+
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;
@@ -67,53 +71,46 @@ bot.on("polling_error", (msg) => console.log(msg));
 //     }
 // });
 
-// Функция, возвращающая ID объекта или undefined
-async function searchChild(name: string) {
-    try {
-        const childId = await findObject(name, 'child');
-        return { found: true, id: childId };
-    } catch (error: any) {
-        if (error.message.includes("PERMISSION_DENIED")) {
-            return { found: false, message: "У вас недостаточно прав для поиска ребенка в базе данных" };
-        } else {
-            return { found: false, message: "Произошла ошибка при поиске ребенка" };
-        }
-    }
-}
-
-
-bot.onText(/\/find/, async (msg: any) => {
-    const inputArray = msg.text ? msg.text.split(' ') : []; //console.log('inputArray: ', inputArray);
+bot.onText(/\/check/, async (msg: any) => {
+    const inputArray = msg.text ? msg.text.split(' ') : [];
 
     if (inputArray.length === 1) {
-        // Запускаем функцию для /find без аргументов
-    } else if (inputArray.length === 2) {
-        // Запускаем функцию для /find с аргументами
-        const [command, name] = inputArray;
-        // Пример вызова функции внутри вашего бота
-        searchChild(name).then((result) => {
-            if (result.found) {
-                console.log(`Ребенок найден с ID: ${result.id}`);
-                bot.sendMessage(msg.chat.id, `Ребенок найден с ID: ${result.id}`);
-            } else {
-                console.log(result.message);
-                bot.sendMessage(msg.chat.id, `${result.message}`);
-            }
-        }).catch((error) => {
-            console.error(error);
-            bot.sendMessage(msg.chat.id, `Error: ${error}`);
-        });
+        // Обработка случая без аргументов
     } else {
-        // Обработка остальных случаев (пустой массив, аргументов больше 2)
         const [command, ...nameArray] = inputArray;
         const name = nameArray.join(' ');
-        searchChild(name).then((result) => {
-            if (result.found) {
-                console.log(`Ребенок найден с ID: ${result.id}`);
-                bot.sendMessage(msg.chat.id, `Ребенок найден с ID: ${result.id}`);
+
+        findObject(name, 'child').then((result) => {
+            if (result.child_id) {
+                // Найден child_id 
+                // Теперь необходимо получить данные о ребенке, родителе и платеже
+                const childRef = db.ref(`children/${result.child_id}`);
+                childRef.once('value', (childSnapshot) => {
+                    const childData = childSnapshot.val();
+
+                    const parentRef = db.ref(`parents/${childData.parent_id}`);
+                    parentRef.once('value', (parentSnapshot) => {
+                        const parentData = parentSnapshot.val();
+
+                        // Получаем данные о платеже из таблицы collections по id платежа из childData
+                        const paymentRef = db.ref(`collections/${childData.payment_id}`);
+                        paymentRef.once('value', (paymentSnapshot) => {
+                            const paymentData = paymentSnapshot.val();
+                            const fullData = {
+                                child: childData,
+                                parent: parentData,
+                                payments: paymentData
+                            };
+
+                            const formattedData = formatDataForDisplay(fullData);
+                            console.log('Полные данные:', formattedData);
+                            bot.sendMessage(msg.chat.id, formattedData);
+                        });
+                    });
+                });
             } else {
-                console.log(result.message);
-                bot.sendMessage(msg.chat.id, `${result.message}`);
+                console.log('Ребенок не найден');
+                bot.sendMessage(msg.chat.id, 'Ребенок не найден');
             }
         }).catch((error) => {
             console.error(error);
