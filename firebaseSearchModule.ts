@@ -17,9 +17,9 @@ type MyReturnValue = {
     child_id: string | null,
     ref: any
 }
+
 // Функция поиска с использованием Fuse
-export function findObject(name: string, type: ObjectType):
-    Promise<MyReturnValue> {
+export function findObject(name: string, type: ObjectType): Promise<MyReturnValue> {
     const ref = type === 'child' ? childrenRef : parentsRef;
     const data: Document[] = [];
 
@@ -47,11 +47,11 @@ export function findObject(name: string, type: ObjectType):
             includeMatches: true
         };
         const fuse = new Fuse(data, options);
-        const results = fuse.search(`${name}*`);
+        const results = fuse.search(name);
 
         //console.log('Search results:', results);
 
-        if (results.length > 0) {
+        if (results.length > 0 && results[0].item.name === name) {
             return {
                 result: results,
                 child_id: results[0].item.id,
