@@ -4,13 +4,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { findObject } from './firebaseSearchModule';
-import { formatDataForDisplay } from './dataFormatting';
+import { formatDataForDisplay, ParentData, PaymentData, FullData, ChildData, CollectionData } from './dataFormatting';
 
 import * as registrationModule from './start';
 import * as paymentsModule from './payment';
-
-
-
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;
 
@@ -83,23 +80,35 @@ bot.onText(/\/check/, async (msg: any) => {
         findObject(name, 'child').then((result) => {
             if (result.child_id) {
                 // Найден child_id 
-                // Теперь необходимо получить данные о ребенке, родителе и платеже
+                // Получаем данные о ребенке
                 const childRef = db.ref(`children/${result.child_id}`);
                 childRef.once('value', (childSnapshot) => {
                     const childData = childSnapshot.val();
 
-                    const parentRef = db.ref(`parents/${childData.parent_id}`);
-                    parentRef.once('value', (parentSnapshot) => {
-                        const parentData = parentSnapshot.val();
+                    const parentPromises: Promise<ParentData>[] = Object.keys(childData.parents).map((parentId: string) => {
+                        return new Promise<ParentData>((resolve, reject) => {
+                            const parentRef = db.ref(`parents/${parentId}`);
+                            parentRef.once('value', (parentSnapshot) => {
+                                resolve(parentSnapshot.val());
+                            });
+                        });
+                    });
 
-                        // Получаем данные о платеже из таблицы collections по id платежа из childData
-                        const paymentRef = db.ref(`collections/${childData.payment_id}`);
-                        paymentRef.once('value', (paymentSnapshot) => {
-                            const paymentData = paymentSnapshot.val();
-                            const fullData = {
+                    Promise.all(parentPromises).then((parentsData) => {
+                        const paymentPromises: Promise<PaymentData>[] = Object.keys(childData.payments).map((paymentId: string) => {
+                            return new Promise<PaymentData>((resolve, reject) => {
+                                const paymentRef = db.ref(`collections/${paymentId}`);
+                                paymentRef.once('value', (paymentSnapshot) => {
+                                    resolve(paymentSnapshot.val());
+                                });
+                            });
+                        });
+
+                        Promise.all(paymentPromises).then((paymentsData) => {
+                            const fullData: FullData = {
                                 child: childData,
-                                parent: parentData,
-                                payments: paymentData
+                                parents: parentsData,
+                                payments: paymentsData
                             };
 
                             const formattedData = formatDataForDisplay(fullData);
