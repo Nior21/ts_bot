@@ -8,7 +8,7 @@ export interface ChildData {
 
 export interface ParentData {
     id: string;
-    number: number;
+    number: string;
     isMain: boolean;
     name: string;
 }
@@ -36,35 +36,79 @@ export interface FullData {
 }
 
 export function formatDataForDisplay(data: FullData): string {
-    let formattedData = `Child Data:\n`;
-    formattedData += `ID: ${data.child.id}\n`;
-    formattedData += `Name: ${data.child.name}\n`;
-    formattedData += `Birthday: ${data.child.birthday}\n`;
-    formattedData += `Gender: ${data.child.gender === 'м' ? 'мужской' : 'женский'}\n\n`;
+    let formattedData = bolt(`Ребенок:`) + '\n';
+    formattedData += `${mono(data.child.name)} (${data.child.gender === 'м' ? 'м' : 'ж'})\n`;
+    formattedData += `ДР: ${mono(formatDate(data.child.birthday))}\n\n`;
 
     data.parents.forEach(function (arr) {
-        formattedData += `Parent Data:\n`;
-        formattedData += `ID: ${arr.id}\n`;
-        formattedData += `Number: ${arr.number}\n`;
-        formattedData += `Is Main: ${arr.isMain ? 'Да' : 'Нет'}\n`;
-        formattedData += `Name: ${arr.name}\n\n`;
+        formattedData += bolt(`Родители:`) + '\n';
+        formattedData += `${mono(arr.number)} ${mono(arr.name)}${arr.isMain ? ' (осн. контакт)' : ''}\n\n`;
     });
 
-    formattedData += `Payments:\n`;
+    formattedData += bolt(`Платежи:`) + '\n';
     data.payments.forEach((payment, index) => {
-        formattedData += `${JSON.stringify(index)}: ${JSON.stringify(payment)}\n`
-        // formattedData += `Payment ${index + 1}:\n`;
-        // //formattedData += `Collection ID: ${payment.collection_id}\n`;
-        // formattedData += `Reference Number: ${payment.bank_account_or_card_number}\n`;
-        // formattedData += `Amount: ${payment.collection_amount}\n`;
-        // formattedData += `Date: ${payment.payment_date}\n`;
-        // formattedData += `Payment Method: ${payment.received_bank}\n`;
-        // formattedData += `Notes: ${payment.comments}\n`;
-
-        // formattedData += `Collection Data:\n`;
-        // formattedData += `Collection Amount: ${payment.collection.collection_amount}\n`;
-        // formattedData += `Collection Name: ${payment.collection.collection_name}\n\n`;
+        if (payment.collection_amount) {
+            formattedData += bolt(`${index + 1}. ${payment.collection.collection_name} (${mono(String(payment.collection.collection_amount))} руб.):`) + '\n';
+            formattedData += `Поступило: ${mono(String(payment.collection_amount))} руб.`;
+            formattedData += payment.payment_date ? ` [${formatDate(payment.payment_date)}]\n` : `\n`;
+            formattedData += `С карты/счета № ${mono(payment.bank_account_or_card_number)} на ${payment.received_bank}\n`;
+            formattedData += payment.comments ? `${payment.comments}\n\n` : `\n`;
+        } else {
+            formattedData += bolt(`${index + 1}. ${payment.collection.collection_name} (${payment.collection.collection_amount} руб.):`) + '\n';
+            formattedData += mono('Данные о платеже отсутствуют') + '\n\n';
+        }
     });
 
     return formattedData;
+}
+
+function formatDate(date: Date | string): string {
+    // Запрашиваем день недели вместе с длинным форматом даты
+    let dateOptions: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    };
+
+    if (date instanceof Date) {
+        return date.toLocaleString('ru-RU', dateOptions);
+    } else if (typeof date === 'string') {
+        const formattedDate = new Date(date).toLocaleString('ru-RU', dateOptions);
+        if (formattedDate !== 'Invalid Date') {
+            return formattedDate;
+        }
+    }
+
+    return date; // Возвращаем саму строку date в случае, если дата не может быть отформатирована
+}
+
+
+export function escapeMarkdownV2(text: string, escapeQuotes: boolean = true): string {
+    let specialCharacters = ['_', '*', '[', ']', '(', ')', ' ', '`', '>', '#', '+', '-', '=', '|', '', '', '.', '!'];
+
+    if (!escapeQuotes) {
+        specialCharacters = specialCharacters.filter(char => char !== '`' && char !== '*');
+    }
+
+    let escapedText = '';
+    for (let i = 0; i < text.length; i++) {
+        if (specialCharacters.includes(text[i])) {
+            escapedText += '\\' + text[i];
+        } else {
+            escapedText += text[i];
+        }
+    }
+
+    return escapedText;
+}
+
+
+function mono(text: string): string {
+    return '`' + text + '`';
+}
+
+function bolt(text: string): string {
+    return '*' + text + '*';
 }

@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { findObject } from './firebaseSearchModule';
-import { formatDataForDisplay, ParentData, PaymentData, FullData, ChildData, CollectionData } from './dataFormatting';
+import { formatDataForDisplay, ParentData, PaymentData, FullData, ChildData, CollectionData, escapeMarkdownV2 } from './dataFormatting';
 
 import * as registrationModule from './start';
 import * as paymentsModule from './payment';
@@ -97,9 +97,25 @@ bot.onText(/\/check/, async (msg: any) => {
                     Promise.all(parentPromises).then((parentsData) => {
                         const paymentPromises: Promise<PaymentData>[] = Object.keys(childData.payments).map((paymentId: string) => {
                             return new Promise<PaymentData>((resolve, reject) => {
-                                const paymentRef = db.ref(`collections/${paymentId}`);
+                                const paymentRef = db.ref(`children/${result.child_id}/payments/${paymentId}`);
                                 paymentRef.once('value', (paymentSnapshot) => {
-                                    resolve(paymentSnapshot.val());
+                                    const paymentData = paymentSnapshot.val();
+                                    const collectionRef = db.ref(`collections/${paymentData.collection_id}`);
+                                    collectionRef.once('value', (collectionSnapshot) => {
+                                        const collectionData = collectionSnapshot.val();
+
+                                        const payment: PaymentData = {
+                                            collection_id: paymentData.collection_id,
+                                            name: paymentData.collection_name,
+                                            bank_account_or_card_number: paymentData.bank_account_or_card_number,
+                                            collection_amount: paymentData.collection_amount,
+                                            payment_date: paymentData.payment_date,
+                                            received_bank: paymentData.received_bank,
+                                            comments: paymentData.comments,
+                                            collection: collectionData // Связываем данные платежей с данными коллекций
+                                        };
+                                        resolve(payment);
+                                    });
                                 });
                             });
                         });
@@ -111,9 +127,9 @@ bot.onText(/\/check/, async (msg: any) => {
                                 payments: paymentsData
                             };
 
-                            const formattedData = formatDataForDisplay(fullData);
+                            const formattedData = escapeMarkdownV2(formatDataForDisplay(fullData), false);
                             console.log('Полные данные:', formattedData);
-                            bot.sendMessage(msg.chat.id, formattedData);
+                            bot.sendMessage(msg.chat.id, formattedData, { parse_mode: 'MarkdownV2' });
                         });
                     });
                 });
