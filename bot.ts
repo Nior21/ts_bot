@@ -1,13 +1,12 @@
+/// <reference path="./database.ts"/>
+
 import TelegramBot from 'node-telegram-bot-api';
 import { db } from './firebaseModule';
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { findObject } from './firebaseSearchModule';
-import { formatDataForDisplay, ParentData, PaymentData, FullData, ChildData, CollectionData, escapeMarkdownV2 } from './dataFormatting';
-
-import * as registrationModule from './start';
-import * as paymentsModule from './payment';
+import * as registrationModule from './startModule';
+import * as checkModule from './checkModule';
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const admin_id = process.env.YOUR_BOT_CREATOR_CHAT_ID!;
 
@@ -15,131 +14,69 @@ export const bot = new TelegramBot(token, { polling: true });
 
 bot.on("polling_error", (msg) => console.log(msg));
 
-// // Реакция на команду /start
-// bot.onText(/\/start/, async (msg: any) => {
-//     registrationModule.registration(msg);
-// });
-
-// // Диалоги, проверка введенного обычного текста
-// bot.on('text', async (msg: any) => {
-//     const stagesRef = db.ref(`users/${msg.chat.id}/stages`);
-
-//     stagesRef.once('value', async (snapshot) => {
-//         const stagesData = snapshot.val();
-//         if (stagesData) {
-//             console.log('> проверяем базовые статусы в БД (stagesData.current)');
-//             switch (stagesData.current) {
-//                 case 'idle':
-//                     bot.sendMessage(admin_id, `${msg.chat.id} > ${msg.text}`);
-//                     bot.sendMessage(msg.chat.id, `Ваше сообщение успешно доставлено администратору: ${msg.text}`);
-//                     break;
-//                 case 'registration':
-//                     if (msg.text !== '/start') {
-//                         registrationModule.regDialogs(msg, stagesRef);
-//                         break;
-//                     }
-//                 case 'payment':
-//                     if (msg.text !== '/payment') {
-//                         // Функция для повторного обращения с указанием имени
-//                         console.log('>> запуск ветки payment')
-//                         paymentsModule.paymentDialog(msg, stagesRef);
-//                         break;
-//                     }
-//                 default:
-//                     console.log('>> статусы не обнаружены')
-//             }
-//         } else { // Если данные пользователя не были найдены, уходим к созданию пользователей
-//             registrationModule.regDialogs(msg, stagesRef);
-//         }
-//     })
-// });
-
-// // Реакция на команду /payment
-// bot.onText(/\/payment/, async (msg: any) => {
-//     const inputArray = msg.text ? msg.text.split(' ') : [];
-//     if (inputArray.length === 1) {
-//         // Запускаем функцию для /payment без аргументов
-//         console.log('> первый запуск /payment.', typeof inputArray, inputArray)
-//         console.log('inputArray.length', typeof inputArray.length, inputArray.length)
-//         paymentsModule.paymentWithoutParam(msg);
-//     } else if (inputArray.length >= 2) {
-//         // Запускаем функцию для /payment c аргументами
-//         paymentsModule.paymentWithParam(msg, inputArray);
-//     }
-// });
-
-bot.onText(/\/check/, async (msg: any) => {
+bot.on('text', async (msg: any) => {
     const inputArray = msg.text ? msg.text.split(' ') : [];
+    const isCommand = msg.text.match(/\/\S+/g) !== null; // Проверяем команда это или просто текст
+    const [command, ...nameArray] = inputArray;
 
-    if (inputArray.length === 1) {
-        // Обработка случая без аргументов
-    } else {
-        const [command, ...nameArray] = inputArray;
-        const name = nameArray.join(' ');
+    // Узнаем о пользователе что можем или создаем нового
+    const userRef = db.ref(`users/${msg.chat.id}`);
+    let userData: any;
+    userRef.once('value', async (snapshot) => {
+        userData = snapshot.val();
+        if (!userData) { // Если пользователя нет в базе users, создаем новую запись
+            userRef.set({
+                registered_on: new Date().toISOString(),
+                stage: 'idle'
+            });
+            bot.sendMessage(msg.chat.id, 'Текущий пользователь не обнаружен в БД, создаем новую карточку...');
+            // Переход к регистрации произойдет в блоке проверки команд и статусов
+        }
+        console.log(userData);
+    });
 
-        findObject(name, 'child').then((result) => {
-            if (result.child_id) {
-                // Найден child_id 
-                // Получаем данные о ребенке
-                const childRef = db.ref(`children/${result.child_id}`);
-                childRef.once('value', (childSnapshot) => {
-                    const childData = childSnapshot.val();
-
-                    const parentPromises: Promise<ParentData>[] = Object.keys(childData.parents).map((parentId: string) => {
-                        return new Promise<ParentData>((resolve, reject) => {
-                            const parentRef = db.ref(`parents/${parentId}`);
-                            parentRef.once('value', (parentSnapshot) => {
-                                resolve(parentSnapshot.val());
-                            });
-                        });
-                    });
-
-                    Promise.all(parentPromises).then((parentsData) => {
-                        const paymentPromises: Promise<PaymentData>[] = Object.keys(childData.payments).map((paymentId: string) => {
-                            return new Promise<PaymentData>((resolve, reject) => {
-                                const paymentRef = db.ref(`children/${result.child_id}/payments/${paymentId}`);
-                                paymentRef.once('value', (paymentSnapshot) => {
-                                    const paymentData = paymentSnapshot.val();
-                                    const collectionRef = db.ref(`collections/${paymentData.collection_id}`);
-                                    collectionRef.once('value', (collectionSnapshot) => {
-                                        const collectionData = collectionSnapshot.val();
-
-                                        const payment: PaymentData = {
-                                            collection_id: paymentData.collection_id,
-                                            name: paymentData.collection_name,
-                                            bank_account_or_card_number: paymentData.bank_account_or_card_number,
-                                            collection_amount: paymentData.collection_amount,
-                                            payment_date: paymentData.payment_date,
-                                            received_bank: paymentData.received_bank,
-                                            comments: paymentData.comments,
-                                            collection: collectionData // Связываем данные платежей с данными коллекций
-                                        };
-                                        resolve(payment);
-                                    });
-                                });
-                            });
-                        });
-
-                        Promise.all(paymentPromises).then((paymentsData) => {
-                            const fullData: FullData = {
-                                child: childData,
-                                parents: parentsData,
-                                payments: paymentsData
-                            };
-
-                            const formattedData = escapeMarkdownV2(formatDataForDisplay(fullData), false);
-                            console.log('Полные данные:', formattedData);
-                            bot.sendMessage(msg.chat.id, formattedData, { parse_mode: 'MarkdownV2' });
-                        });
-                    });
-                });
-            } else {
-                console.log('Ребенок не найден');
-                bot.sendMessage(msg.chat.id, 'Ребенок не найден');
+    if (isCommand) { // Обрабатываем команды и статусы. Сначала команду, потом размер
+        switch (command) {
+            case '/start':
+                registrationModule.registration(msg);
+                break;
+            case '/check': // Пытаемся получить информацию по ребенку
+                if (!userData.child) { // Сначала надо убедиться что ребенок не указан, прежде чем спросить про ребенка
+                    if (inputArray.length === 1) {
+                        bot.sendMessage(msg.chat.id, `Укажите имя ребенка для поиска данных...`); // Затем запрашиваем имя ребенка у пользователя
+                        userRef.update({ stage: 'waiting_child_name' }); // Обновляем статус пользователю на ожидание имени ребенка
+                    } else { // Если ребенок указан в запросе
+                        const name = nameArray.join(' ');
+                        checkModule.check(name, msg);
+                    }
+                }
+                break;
+            default:
+                console.error(`Получена неизвестная команда`);
+                bot.sendMessage(msg.chat.id, `Получена неизвестная команда`);
+                break;
+        }
+    } else { // Если не команда, то проверяем stage
+        const stagesRef = db.ref(`users/${msg.chat.id}/stage`);
+        stagesRef.once('value', async (snapshot) => {
+            const stageData = snapshot.val();
+            if (stageData) {
+                switch (stageData) {
+                    case 'idle': // Режим ожидания, можно общаться с администратором бота
+                        bot.sendMessage(admin_id, `Сообщение от "Инкогнито \[${msg.chat.id}\]\/ИмяВзятьИзБазы": \_${msg.text}\_`);
+                        //bot.sendMessage(msg.chat.id, `Ваше сообщение успешно доставлено администратору: ${msg.text}`);
+                        break;
+                    case 'waiting_child_name':
+                        registrationModule.registration(msg);
+                        break;
+                    default:
+                        console.log('Актуальный статус не обнаружен, возможно пользователь не зарегистрирован.')
+                        bot.sendMessage(msg.chat.id, `Актуальный статус не обнаружен, возможно пользователь \[${msg.chat.id}\] не зарегистрирован.`);
+                }
+            } else { // Если данные пользователя не были найдены, уходим к созданию пользователей
+                bot.sendMessage(msg.chat.id, `Пользователь с вашим ID \[${msg.chat.id}\] не обнаружен. Переключаем бота на регистрацию...`);
+                registrationModule.registration(msg);
             }
-        }).catch((error) => {
-            console.error(error);
-            bot.sendMessage(msg.chat.id, `Error: ${error}`);
-        });
+        })
     }
 });

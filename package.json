@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "tsc --build",
-    "clean": "tsc --build --clean"
+    "clean": "tsc --build --clean",
+    "start": "tsc --build && node dist/bot.js"
   },
   "devDependencies": {
     "@types/node-telegram-bot-api": "^0.64.3",

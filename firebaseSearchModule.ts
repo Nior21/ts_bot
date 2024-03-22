@@ -12,7 +12,7 @@ interface Document {
     name: string;
 }
 
-type MyReturnValue = {
+export type MyReturnValue = {
     result: any,
     child_id: string | null,
     ref: any
