@@ -1,9 +1,11 @@
+// Test Jenkins 3
 import { Data } from './database';
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
+
 
 export const bot = new TelegramBot(token, { polling: true });
 
@@ -35,6 +37,4 @@ bot.on('text', async (msg: any) => {
         console.error('Error handling the message:', error);
         return 'An error occurred while processing your request.';
     }
-
-
 });

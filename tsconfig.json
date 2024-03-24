@@ -9,9 +9,7 @@
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true
     },
-    "include": [
-        "**/*.ts"
-, "node_modules/@types/node-telegram-bot-api/telegram-bot-extensions.d.ts"    ],
+    "include": ["**/*.ts"],
     "exclude": [
         "node_modules"
     ]
