@@ -35,4 +35,5 @@ bot.on('text', async (msg: any) => {
         console.error('Error handling the message:', error);
         return 'An error occurred while processing your request.';
     }
+
 });
