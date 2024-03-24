@@ -11,7 +11,7 @@
     },
     "include": [
         "**/*.ts"
-    ],
+, "node_modules/@types/node-telegram-bot-api/telegram-bot-extensions.d.ts"    ],
     "exclude": [
         "node_modules"
     ]
