@@ -6,10 +6,10 @@ dotenv.config();
 // Модули
 import { Data } from './modules/databaseModule';
 import { checkUser } from './modules/checkUserModule';
+import { answer } from './modules/answerModule';
 // Окружение
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 export const bot = new TelegramBot(token, { polling: true });
-
 // Код бота
 bot.on('text', async (msg: any) => {
     const isCommand = msg.text.match(/\/\S+/g) !== null;
@@ -22,7 +22,6 @@ bot.on('text', async (msg: any) => {
             break;
     }
 });
-
 // Функция для обработки "автозаполнения" в чате с кнопкой для инлайн-поиска
 export async function handleAutoCompleteSearch(msg: any) {
     const chatId = msg.chat.id;
@@ -35,7 +34,7 @@ export async function handleAutoCompleteSearch(msg: any) {
                 inline_keyboard: [
                     [
                         {
-                            text: 'Поиск в записях',
+                            text: 'Начать поиск ребенка по имени...',
                             switch_inline_query_current_chat: ''
                         }
                     ]
@@ -44,7 +43,7 @@ export async function handleAutoCompleteSearch(msg: any) {
         };
 
         // Отправляем сообщение с кнопкой "Поиск в записях"
-        bot.sendMessage(chatId, 'Выберите действие:', messageOptions);
+        answer(chatId, 'Давайте привяжем ребенка к вашей учетной записи:', messageOptions);
         // Вызываем функцию для обработки инлайн-запросов
         findAndLinkChild(msg);
     });
@@ -60,9 +59,9 @@ export function findAndLinkChild(msg: any) {
             const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = [{
                 type: 'article',
                 id: childrenData.object_id,
-                title: `Результат поиска: ${searchString}`,
+                title: `Обнаружены следующие записи: ${searchString}`,
                 input_message_content: {
-                    message_text: `Пользователь выбрал ребенка: ${childrenData.object_id}`
+                    message_text: `Выбран ребенок: ${childrenData.object_id}`
                 }
             }];
             bot.answerInlineQuery(query.id, inlineQueryResults);
