@@ -1,5 +1,21 @@
-import { db } from './firebaseModule';
+import * as adminSDK from 'firebase-admin';
 import Fuse from 'fuse.js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const databaseURL = process.env.DATABASE_URL!;
+
+// Инициализация Firebase Admin SDK с использованием сервисного аккаунта
+const serviceAccount = require('./../serviceAccountKey.json');
+
+// Инициализация приложения Firebase
+adminSDK.initializeApp({
+    credential: adminSDK.credential.cert(serviceAccount as adminSDK.ServiceAccount),
+    databaseURL: databaseURL
+});
+
+// Создание ссылки на базу данных
+const db = adminSDK.database();
 
 export interface Document {
     id: string;
@@ -17,18 +33,26 @@ export class Data {
     constructor(protected name: string) { }
 
     async get(): Promise<any> {
-        const ref = db.ref(this.name);
-        const snapshot = await ref.once('value');
-        this.data = snapshot.val();
-        return this.data;
+        try {
+            const ref = db.ref(this.name);
+            const snapshot = await ref.once('value');
+            this.data = snapshot.val();
+            return this.data;
+        } catch (error) {
+            console.log('Error getting data:', error);
+        }
     }
 
     async set(data: any): Promise<any> {
-        const ref = db.ref(this.name);
-        await ref.update(data);
-        const snapshot = await ref.once('value');
-        this.data = snapshot.val();
-        return this.data;
+        try {
+            const ref = db.ref(this.name);
+            await ref.update(data);
+            const snapshot = await ref.once('value');
+            this.data = snapshot.val();
+            return this.data;
+        } catch (error) {
+            console.log('Error setting data:', error);
+        }
     }
 
     async findObject(property: string, value: any): Promise<ReturnValue> {
@@ -68,32 +92,4 @@ export class Data {
             };
         }
     }
-}
-
-export class Child extends Data {
-    constructor(name: string) {
-        super(name);
-    }
-    // Дополнительные методы для работы с детьми, если необходимо
-}
-
-export class Collect extends Data {
-    constructor(name: string) {
-        super(name);
-    }
-    // Дополнительные методы для работы с коллекциями, если необходимо
-}
-
-export class Parent extends Data {
-    constructor(name: string) {
-        super(name);
-    }
-    // Дополнительные методы для работы с родителями, если необходимо
-}
-
-export class User extends Data {
-    constructor(name: string) {
-        super(name);
-    }
-    // Дополнительные методы для работы с пользователями, если необходимо
 }

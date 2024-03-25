@@ -1,12 +1,9 @@
-// Test Jenkins 3
 import { Data } from './database';
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
-
-
 export const bot = new TelegramBot(token, { polling: true });
 
 bot.on("polling_error", (msg) => console.log(msg));
@@ -27,14 +24,18 @@ bot.on('text', async (msg: any) => {
                     stage: 'idle'
                 }
             });
-            console.log('Created a new user with ID:', msg.chat.id);
-            return `Created a new user with ID: ${msg.chat.id}`;
+            return answer(msg.chat.id, `Created a new user with ID:`, msg.chat.id);
         } else {
-            console.log(`Welcome back! Account with ID: ${msg.chat.id} successfully initialized.`);
-            return `Welcome back! Account with ID: ${msg.chat.id} successfully initialized.`;
+            return answer(msg.chat.id, `Welcome back! Account with ID: ${msg.chat.id} successfully initialized.`);
         }
     } catch (error) {
-        console.error('Error handling the message:', error);
-        return 'An error occurred while processing your request.';
+        return answer(msg.chat.id, 'Error handling the message:', error);
     }
 });
+
+const answer = (chatId: string, text: string, data?: any) => {
+    const result = data ? text + data : text;
+    console.log(result);
+    bot.sendMessage(chatId, result);
+    return result;
+}
