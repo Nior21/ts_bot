@@ -1,0 +1,8 @@
+{
+    "watch": [
+        "*.ts",
+        "*.json"
+    ],
+    "ext": "ts,json",
+    "exec": "tsc --build && node dist/bot.js"
+}
