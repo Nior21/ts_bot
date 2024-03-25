@@ -1,41 +1,73 @@
-import { Data } from './database';
+//bot.ts
+// Библиотеки
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 dotenv.config();
-
+// Модули
+import { Data } from './modules/databaseModule';
+import { checkUser } from './modules/checkUserModule';
+// Окружение
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 export const bot = new TelegramBot(token, { polling: true });
 
-bot.on("polling_error", (msg) => console.log(msg));
-
+// Код бота
 bot.on('text', async (msg: any) => {
     const isCommand = msg.text.match(/\/\S+/g) !== null;
     const inputArray = msg.text ? msg.text.split(' ') : [];
     const [command, ...rest] = inputArray;
 
-    const currentUser = new Data(`users/${msg.chat.id}`);
-    try {
-        let dataExists = await currentUser.get();
-
-        if (!dataExists) {
-            await currentUser.set({
-                [msg.chat.id]: {
-                    registered_on: new Date().toISOString(),
-                    stage: 'idle'
-                }
-            });
-            return answer(msg.chat.id, `Created a new user with ID:`, msg.chat.id);
-        } else {
-            return answer(msg.chat.id, `Welcome back! Account with ID: ${msg.chat.id} successfully initialized.`);
-        }
-    } catch (error) {
-        return answer(msg.chat.id, 'Error handling the message:', error);
+    switch (command) {
+        case '/start':
+            handleAutoCompleteSearch(msg);
+            break;
     }
 });
 
-const answer = (chatId: string, text: string, data?: any) => {
-    const result = data ? text + data : text;
-    console.log(result);
-    bot.sendMessage(chatId, result);
-    return result;
+// Функция для обработки "автозаполнения" в чате с кнопкой для инлайн-поиска
+export async function handleAutoCompleteSearch(msg: any) {
+    const chatId = msg.chat.id;
+
+    // Создаем карточку пользователя в базе данных
+    checkUser(msg).then(() => {
+        // Показываем кнопку для поиска в записях
+        const messageOptions = {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {
+                            text: 'Поиск в записях',
+                            switch_inline_query_current_chat: ''
+                        }
+                    ]
+                ]
+            }
+        };
+
+        // Отправляем сообщение с кнопкой "Поиск в записях"
+        bot.sendMessage(chatId, 'Выберите действие:', messageOptions);
+        // Вызываем функцию для обработки инлайн-запросов
+        findAndLinkChild(msg);
+    });
+}
+
+// Функция для обработки инлайн-запросов и возврата результатов поиска
+export function findAndLinkChild(msg: any) {
+    bot.on('inline_query', async (query) => {
+        const searchString = query.query;
+        const childrenData = await new Data('children').findObject('name', searchString);
+
+        if (childrenData.object_id) {
+            const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = [{
+                type: 'article',
+                id: childrenData.object_id,
+                title: `Результат поиска: ${searchString}`,
+                input_message_content: {
+                    message_text: `Пользователь выбрал ребенка: ${childrenData.object_id}`
+                }
+            }];
+            bot.answerInlineQuery(query.id, inlineQueryResults);
+        } else {
+            bot.answerInlineQuery(query.id, []);
+        }
+    });
 }
