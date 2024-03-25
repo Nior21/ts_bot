@@ -25,7 +25,6 @@ bot.on('text', async (msg: any) => {
 // Функция для обработки "автозаполнения" в чате с кнопкой для инлайн-поиска
 export async function handleAutoCompleteSearch(msg: any) {
     const chatId = msg.chat.id;
-
     // Создаем карточку пользователя в базе данных
     checkUser(msg).then(() => {
         // Показываем кнопку для поиска в записях
@@ -34,7 +33,7 @@ export async function handleAutoCompleteSearch(msg: any) {
                 inline_keyboard: [
                     [
                         {
-                            text: 'Начать поиск ребенка по имени...',
+                            text: 'Начать поиск ребенка...',
                             switch_inline_query_current_chat: ''
                         }
                     ]
@@ -43,7 +42,7 @@ export async function handleAutoCompleteSearch(msg: any) {
         };
 
         // Отправляем сообщение с кнопкой "Поиск в записях"
-        answer(chatId, 'Давайте привяжем ребенка к вашей учетной записи:', messageOptions);
+        answer(chatId, `Необходимо привязать ребенка к вашей учетной записи:`, messageOptions);
         // Вызываем функцию для обработки инлайн-запросов
         findAndLinkChild(msg);
     });
@@ -52,18 +51,19 @@ export async function handleAutoCompleteSearch(msg: any) {
 // Функция для обработки инлайн-запросов и возврата результатов поиска
 export function findAndLinkChild(msg: any) {
     bot.on('inline_query', async (query) => {
-        const searchString = query.query;
-        const childrenData = await new Data('children').findObject('name', searchString);
+        const searchName = query.query;
+        const childrenData = await new Data('children').findObject('name', searchName); // Предположим, метод findObjects возвращает массив результатов
 
-        if (childrenData.object_id) {
-            const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = [{
+        if (childrenData.result) {
+            const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = childrenData.result.map((childData: any) => ({
                 type: 'article',
-                id: childrenData.object_id,
-                title: `Обнаружены следующие записи: ${searchString}`,
+                id: childData.item.id,
+                title: `${childData.item.name}`,
                 input_message_content: {
-                    message_text: `Выбран ребенок: ${childrenData.object_id}`
+                    message_text: `Вы выбрали ребенка из списка: ${childData.item.name}`
                 }
-            }];
+            }));
+
             bot.answerInlineQuery(query.id, inlineQueryResults);
         } else {
             bot.answerInlineQuery(query.id, []);
