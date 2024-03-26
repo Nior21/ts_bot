@@ -5,55 +5,41 @@ import TelegramBot from 'node-telegram-bot-api';
 import { bot } from '../bot'
 import { Data } from './databaseModule';
 import { answer } from './answerModule';
-import { escapeMarkdownV2, mono } from './formatModule';
 
 export async function inlineSearch(msg: any, question: string, dataType: string): Promise<void> {
-    // TODO: проверять авторизацию (права) пользователей в базе
-    const option = {  // Возвращаем кнопку для поиска в записях
+    const option = {
         reply_markup: {
-            inline_keyboard: [[{
-                text: `Начать поиск (${dataType})...`,
-                switch_inline_query_current_chat: ''
-            }]]
+            inline_keyboard: [
+                [
+                    {
+                        text: `Начать поиск (${dataType})...`,
+                        switch_inline_query_current_chat: ''
+                    }
+                ]
+            ]
         }
     };
+
     return new Promise((resolve, reject) => {
         // Отправляем сообщение с кнопкой "Поиск в записях"
-        answer(msg.chat.id, escapeMarkdownV2(`Теперь привяжите ребенка к вашей учетной записи.
-            Пример поисковой строки:
-            ${mono('@iXNF0i5sZJzCoJ0W_bot Вася')}
-            Кнопка ниже подставит имя бота и начнет поиск...`, false), option);
+        answer(msg.chat.id, question, false, option);
 
-        bot.on('inline_query', async (query) => { // Обработка инлайн-запросов
+        bot.on('inline_query', async (query) => {
             const searchName = query.query;
-            const data = await new Data(dataType).findObject('name', searchName);
+            let data: any;
 
-            if (data.result) {
-                const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = data.result.map((onesElement: any) => ({
-                    type: 'article',
-                    id: onesElement.item.id,
-                    title: `${onesElement.item.name}`,
-                    input_message_content: {
-                        message_text: escapeMarkdownV2(`Из списка выбран(-а): ${onesElement.item.name}`)
-                    }
-                }));
-                bot.answerInlineQuery(query.id, inlineQueryResults)
-                    .then(() => {
-                        // Поиск завершен, можно выполнить следующую функцию или что-то еще
-                        resolve();
-                    })
-                    .catch((error) => {
-                        reject(error);
-                    });
-            } else {
-                bot.answerInlineQuery(query.id, [])
-                    .then(() => {
-                        // Поиск завершен, можно выполнить следующую функцию или что-то еще
-                        resolve();
-                    })
-                    .catch((error) => {
-                        reject(error);
-                    });
+            try {
+                data = await new Data(dataType).findObject('name', searchName);
+            } catch (error) {
+                reject(error);
+            }
+
+            if (data.result) { // Успех
+                const result = data.result;
+                resolve();
+            } else { // Отказ
+                bot.answerInlineQuery(query.id, []);
+                reject(`Объекты не найдены ${dataType}.`);
             }
         });
     });

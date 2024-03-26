@@ -1,7 +1,9 @@
 //answerModule.ts
 import { bot } from './../bot';
+import { escapeMarkdownV2 } from './formatModule';
 
-export const answer = (chatId: string, text: string, options?: any) => {
+export const answer = (chatId: string, text: string, escape?: boolean, options?: any) => {
+    text = escapeMarkdownV2(text, escape);
     console.log(text);
 
     // Объединяем переданные опции с опцией parse_mode: 'MarkdownV2'

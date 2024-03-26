@@ -18,6 +18,6 @@ export const checkUser = async (msg: any) => {
             return answer(msg.chat.id, `Ваш аккаунт уже инициализирован с ID: ${mono(String(msg.chat.id))}`);
         }
     } catch (error) {
-        return answer(msg.chat.id, 'Error handling the message:', error);
+        return answer(msg.chat.id, `Error handling the message: ${error}`);
     }
 }
