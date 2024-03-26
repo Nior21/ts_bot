@@ -1,23 +1,26 @@
-//inlineModule.ts
-/** Библиотеки */
 import TelegramBot, { ChosenInlineResult, InlineQuery } from 'node-telegram-bot-api';
-/** Модули */
-import { bot } from '../bot'
+import { bot } from '../bot';
 import { Data } from './databaseModule';
 import { answer } from './answerModule';
 import { escapeMarkdownV2 } from './formatModule';
-/** Переменные */
-let chosenItem = '';
-/** Код модуля */
 
-function handleInlineQuery(resolve: any, reject: any, dataType: string): (query: InlineQuery) => Promise<void> {
+let chosenItem = '';
+let queryListener: any;
+
+const handlerChosenInlineResult = (resolve: any): (chosenResult: ChosenInlineResult) => void => {
+    return (chosenResult: ChosenInlineResult) => {
+        chosenItem = chosenResult.result_id;
+        resolve(chosenItem);
+    };
+};
+
+async function handleInlineQuery(resolve: any, reject: any, dataType: string): Promise<(query: InlineQuery) => Promise<void>> {
     return async (query: InlineQuery): Promise<void> => {
         const searchName = query.query;
         let data: any;
 
         try {
             data = await new Data(dataType).findObject('name', searchName, 3);
-            console.log(data);
             if (data.result) {
                 const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] = data.result.map((onesElement: any) => ({
                     type: 'article',
@@ -43,12 +46,14 @@ function handleInlineQuery(resolve: any, reject: any, dataType: string): (query:
         } catch (error) {
             reject(error);
         } finally {
-            bot.removeListener('inline_query', handleInlineQuery(resolve, reject, dataType));
+
+            bot.removeListener('chosen_inline_result', handlerChosenInlineResult(resolve));
+            // Дополнительно можно здесь очистить данные поиска или сделать другие необходимые действия
+            queryListener.removeListener();
+            resolve('someResult'); // Завершаем функцию поиска с результатом
         }
     };
 }
-
-// Остальной код
 
 export async function inlineSearch(msg: any, question: string, dataType: string): Promise<string> {
     const option = {
@@ -64,19 +69,15 @@ export async function inlineSearch(msg: any, question: string, dataType: string)
         }
     };
 
-    const handlerChosenInlineResult = (resolve: any): (chosenResult: ChosenInlineResult) => void => {
-        return (chosenResult: ChosenInlineResult) => {
-            chosenItem = chosenResult.result_id;
-            resolve(chosenItem);
-        };
-    };
+    return new Promise<string>(async (resolve, reject) => {
+        const queryHandler = await handleInlineQuery(resolve, reject, dataType);
 
-    return new Promise<string>((resolve, reject) => {
+        bot.on('inline_query', queryHandler);
+
         bot.on('chosen_inline_result', handlerChosenInlineResult(resolve));
 
-        // Добавили вызов handleInlineQuery с передачей необходимых параметров
-        bot.on('inline_query', handleInlineQuery(resolve, reject, dataType));
-
         answer(msg.chat.id, question, false, option);
+
+        queryListener = bot.on('inline_query', queryHandler);
     });
 }
