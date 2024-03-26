@@ -4,13 +4,21 @@ import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 dotenv.config();
 // Модули
-import { escapeMarkdownV2, mono } from './modules/formatModule';
-import { answer } from './modules/answerModule';
+import { mono } from './modules/formatModule';
 import { checkUser } from './modules/checkUserModule';
 import { inlineSearch } from './modules/inlineModule';
 // Окружение
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 const isInline = false;
+
+const question1 = `Теперь привяжите ребенка к вашей учетной записи.
+Пример:
+${mono('@iXNF0i5sZJzCoJ0W_bot Вася')}
+Кнопка ниже подставит имя бота и начнет поиск...`
+const question2 = `Теперь привяжите родителя к вашей учетной записи.
+Формат: ${mono('@some_name_bot <child_name>')}
+Пример: ${mono('@iXNF0i5sZJzCoJ0W_bot Николай')}
+Кнопка ниже подставит имя бота и начнет поиск...`
 
 export const bot = new TelegramBot(token, { polling: true });
 // Код бота
@@ -20,24 +28,9 @@ bot.on('text', async (msg: any) => {
     switch (command) {
         case '/start':
             checkUser(msg).then(() => {
-                const search = inlineSearch(msg, 'children').then(({ option, handler }) => {
-                    // Отправляем сообщение с кнопкой "Поиск в записях"
-                    answer(msg.chat.id, escapeMarkdownV2(`Теперь привяжите ребенка к вашей учетной записи.
-Формат: ${mono('@some_name_bot <child_name>')}
-Пример: ${mono('@iXNF0i5sZJzCoJ0W_bot Вася')}
-Кнопка ниже подставит имя бота и начнет поиск...`, false), option);
-                    handler(msg)
+                inlineSearch(msg, question1, 'children').then(() => {
+                    inlineSearch(msg, question2, 'parents')
                 })
-
-
-
-            }).then(() => {
-                // Отправляем сообщение с кнопкой "Поиск в записях"
-                answer(msg.chat.id, escapeMarkdownV2(`Теперь привяжите родителя к вашей учетной записи.
-Формат: ${mono('@some_name_bot <child_name>')}
-Пример: ${mono('@iXNF0i5sZJzCoJ0W_bot Николай')}
-Кнопка ниже подставит имя бота и начнет поиск...`, false), inlineSearch(msg, 'parents'));
-
             });
             break;
     }
