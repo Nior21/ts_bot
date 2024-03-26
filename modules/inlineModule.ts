@@ -9,10 +9,9 @@ import { escapeMarkdownV2 } from './formatModule';
 /** Переменные */
 let chosenItem = '';
 /** Код модуля */
-function handlerChosenInlineResult(resolve: any): (result: ChosenInlineResult) => void {
+function handlerChosenInlineResult(resolve: any): (chosenResult: ChosenInlineResult) => void {
     return (chosenResult: ChosenInlineResult) => {
         chosenItem = chosenResult.result_id;
-        bot.removeListener('chosen_inline_result', handlerChosenInlineResult); // Уберите resolve из обработчика события
         resolve(chosenItem);
     };
 }
@@ -64,6 +63,8 @@ export async function inlineSearch(msg: any, question: string, dataType: string)
                 }
             } catch (error) {
                 reject(error);
+            } finally {
+                bot.removeListener('chosen_inline_result', handlerChosenInlineResult(resolve)); // Удаление обработчика после использования
             }
         });
         answer(msg.chat.id, question, false, option);
