@@ -1,3 +1,4 @@
+//databaseModule.tss
 import * as adminSDK from 'firebase-admin';
 import Fuse from 'fuse.js';
 import dotenv from 'dotenv';
@@ -56,7 +57,7 @@ export class Data {
         }
     }
 
-    async findObject(property: string, value: any): Promise<ReturnValue> {
+    async findObject(property: string, value: any, maxResults: number = -1): Promise<ReturnValue> {
         const ref = db.ref(this.name);
         const data: Document[] = [];
 
@@ -77,7 +78,11 @@ export class Data {
             includeMatches: true
         };
         const fuse = new Fuse(data, options);
-        const results = fuse.search(value);
+        let results = fuse.search(value);
+
+        if (maxResults !== -1) {
+            results = results.slice(0, maxResults);
+        }
 
         if (results.length > 0 && results[0].item.name === value) {
             return {
