@@ -1,13 +1,21 @@
 //inlineModule.ts
 /** Библиотеки */
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { ChosenInlineResult } from 'node-telegram-bot-api';
 /** Модули */
 import { bot } from '../bot'
 import { Data } from './databaseModule';
 import { answer } from './answerModule';
 import { escapeMarkdownV2 } from './formatModule';
 /** Переменные */
-let chosenItem: string = '';
+let chosenItem = '';
+/** Код модуля */
+function handlerChosenInlineResult(resolve: any): (result: ChosenInlineResult) => void {
+    return (chosenResult: ChosenInlineResult) => {
+        chosenItem = chosenResult.result_id;
+        bot.removeListener('chosen_inline_result', handlerChosenInlineResult); // Уберите resolve из обработчика события
+        resolve(chosenItem);
+    };
+}
 
 export async function inlineSearch(msg: any, question: string, dataType: string): Promise<string> {
     const option = {
@@ -24,13 +32,7 @@ export async function inlineSearch(msg: any, question: string, dataType: string)
     };
 
     return new Promise<string>((resolve, reject) => {
-        // Отправляем сообщение с кнопкой "Поиск в записях"
-        answer(msg.chat.id, question, false, option);
-
-        bot.on('chosen_inline_result', (chosenResult) => {
-            chosenItem = chosenResult.result_id;
-            resolve(chosenItem); // Резолвим промис после выбора пользователя
-        });
+        bot.on('chosen_inline_result', handlerChosenInlineResult(resolve));
 
         bot.on('inline_query', async (query) => {
             const searchName = query.query;
@@ -46,22 +48,24 @@ export async function inlineSearch(msg: any, question: string, dataType: string)
                         input_message_content: {
                             message_text: escapeMarkdownV2(`Из списка выбран(-а): ${onesElement.item.name}`)
                         }
-                    }))
+                    }));
                     bot.answerInlineQuery(query.id, inlineQueryResults);
                 } else {
-                    bot.answerInlineQuery(query.id, []);
+                    const inlineQueryResults: TelegramBot.InlineQueryResultArticle[] =
+                        [{
+                            type: 'article',
+                            id: '0',
+                            title: `Объекты недоступны`,
+                            input_message_content: {
+                                message_text: `Поиск в базе не удался`
+                            }
+                        }];
+                    bot.answerInlineQuery(query.id, inlineQueryResults);
                 }
             } catch (error) {
                 reject(error);
             }
-
-            if (data.result) {
-                // Успешный поиск, результат возвращается пользователю
-                const result = data.result;
-            } else {
-                bot.answerInlineQuery(query.id, []);
-                reject(`Объекты не найдены (${dataType}).`);
-            }
         });
+        answer(msg.chat.id, question, false, option);
     });
 }
